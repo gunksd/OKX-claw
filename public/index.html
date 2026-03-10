@@ -1,0 +1,1653 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg viewBox='0 0 32 32' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Crect width='32' height='32' rx='6' fill='%23FCD535'/%3E%3Cpath d='M10 10h4.5v4.5H10V10zm7.5 0H22v4.5h-4.5V10zM10 17.5h4.5V22H10v-4.5zm7.5 0H22V22h-4.5v-4.5z' fill='%230b0e11'/%3E%3C/svg%3E">
+<title>OKX-Claw | Arbitrage Scanner</title>
+<style>
+/* ───── Reset & Theme ───── */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:        #0b0e11;
+  --bg-surface:#181a20;
+  --bg-card:   #1e2329;
+  --bg-hover:  #262b34;
+  --border:    #2b3139;
+  --text:      #eaecef;
+  --text-sec:  #848e9c;
+  --text-tri:  #5e6673;
+  --green:     #0ecb81;
+  --green-bg:  rgba(14,203,129,.08);
+  --red:       #f6465d;
+  --red-bg:    rgba(246,70,93,.08);
+  --yellow:    #fcd535;
+  --yellow-bg: rgba(252,213,53,.08);
+  --blue:      #1e9eff;
+  --blue-bg:   rgba(30,158,255,.08);
+  --r:         8px;
+  --font:      -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+  --mono:      'SF Mono','Cascadia Code','Fira Code','JetBrains Mono',Consolas,monospace;
+}
+html{background:var(--bg);color:var(--text);font:14px/1.5 var(--font)}
+a{color:var(--blue);text-decoration:none}
+button{font:inherit;cursor:pointer;border:none;background:none;color:inherit}
+
+/* ───── Layout ───── */
+.wrap{max-width:1400px;margin:0 auto;padding:0 20px 40px}
+
+/* ───── Header ───── */
+header{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;
+  border-bottom:1px solid var(--border);position:sticky;top:0;z-index:10;background:var(--bg)}
+.logo{display:flex;align-items:center;gap:12px}
+.logo svg{width:32px;height:32px}
+.logo h1{font-size:18px;font-weight:600;letter-spacing:-.02em}
+.logo h1 span{color:var(--yellow)}
+.badge{font-size:11px;padding:2px 8px;border-radius:4px;background:var(--bg-card);
+  color:var(--text-sec);border:1px solid var(--border);margin-left:8px}
+.header-r{display:flex;align-items:center;gap:16px;font-size:13px;color:var(--text-sec)}
+.status-dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:6px}
+.status-dot.live{background:var(--green);box-shadow:0 0 6px var(--green)}
+.status-dot.scanning{background:var(--yellow);animation:pulse 1s infinite}
+.status-dot.off{background:var(--text-tri)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* ───── Lang Toggle ───── */
+.lang-btn{padding:4px 10px;border-radius:4px;font-size:12px;font-weight:600;
+  border:1px solid var(--border);color:var(--text-sec);transition:all .2s;letter-spacing:.03em}
+.lang-btn:hover{border-color:var(--yellow);color:var(--yellow)}
+
+/* ───── Stats ───── */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;
+  margin:20px 0}
+.stat{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r);
+  padding:16px 20px;transition:border-color .2s}
+.stat:hover{border-color:var(--text-tri)}
+.stat-label{font-size:12px;color:var(--text-sec);margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em}
+.stat-val{font-size:28px;font-weight:600;font-family:var(--mono);line-height:1.2}
+.stat-sub{font-size:12px;color:var(--text-tri);margin-top:4px}
+.stat.green .stat-val{color:var(--green)}
+.stat.red .stat-val{color:var(--red)}
+.stat.yellow .stat-val{color:var(--yellow)}
+.stat.blue .stat-val{color:var(--blue)}
+
+/* ───── Tabs ───── */
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--border);margin-bottom:16px}
+.tab{padding:10px 20px;font-size:14px;color:var(--text-sec);border-bottom:2px solid transparent;
+  transition:all .2s}
+.tab:hover{color:var(--text)}
+.tab.active{color:var(--yellow);border-bottom-color:var(--yellow)}
+.panel{display:none}
+.panel.active{display:block;animation:fadeIn .3s}
+@keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+
+/* ───── Filters ───── */
+.filters{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap}
+.flt{padding:5px 14px;border-radius:20px;font-size:12px;border:1px solid var(--border);
+  color:var(--text-sec);transition:all .2s}
+.flt:hover{border-color:var(--text-tri);color:var(--text)}
+.flt.active{background:var(--yellow);color:#0b0e11;border-color:var(--yellow);font-weight:500}
+
+/* ───── Table ───── */
+.tbl-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:var(--r)}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{background:var(--bg-surface);font-weight:500;color:var(--text-sec);text-transform:uppercase;
+  font-size:11px;letter-spacing:.05em;position:sticky;top:0;z-index:1}
+th,td{padding:10px 14px;text-align:left;white-space:nowrap;border-bottom:1px solid var(--border)}
+tr:last-child td{border-bottom:none}
+tbody tr{transition:background .15s}
+tbody tr:hover{background:var(--bg-hover)}
+.num{font-family:var(--mono);text-align:right}
+.pos{color:var(--green)}
+.neg{color:var(--red)}
+.warn{color:var(--yellow)}
+.muted{color:var(--text-tri)}
+
+/* ───── Status Tags ───── */
+.tag{display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:500}
+.tag-pass{background:var(--green-bg);color:var(--green)}
+.tag-block{background:var(--yellow-bg);color:var(--yellow)}
+.tag-fail{background:var(--red-bg);color:var(--red)}
+.tag-skip{background:rgba(94,102,115,.15);color:var(--text-tri)}
+
+/* ───── Price Matrix ───── */
+.price-grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(360px,1fr))}
+.price-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r);overflow:hidden}
+.price-card-head{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;
+  align-items:center;justify-content:space-between}
+.price-card-head h3{font-size:15px;font-weight:600}
+.price-card-cex{font-size:12px;color:var(--text-sec);font-family:var(--mono)}
+.price-card-body{padding:8px 0}
+.price-row{display:flex;align-items:center;justify-content:space-between;padding:6px 16px;
+  transition:background .15s;cursor:pointer}
+.price-row:hover{background:var(--bg-hover)}
+.price-chain{color:var(--text-sec);font-size:13px;min-width:90px}
+.price-val{font-family:var(--mono);font-size:13px}
+.price-diff{font-size:11px;font-family:var(--mono);min-width:70px;text-align:right}
+.price-kicon{font-size:10px;color:var(--text-tri);opacity:0;transition:opacity .2s;margin-left:6px}
+.price-row:hover .price-kicon{opacity:1}
+.price-sparkline{width:80px;height:28px;margin-left:auto;flex-shrink:0}
+.price-card-chart{padding:0 8px 8px;border-top:1px solid var(--border);margin-top:4px}
+.spark-canvas{width:100%;height:60px;display:block;cursor:pointer}
+.spark-canvas:hover{opacity:.85}
+
+/* ───── Add Token Modal ───── */
+.add-overlay{position:fixed;inset:0;z-index:100;background:rgba(0,0,0,.7);display:none;
+  align-items:center;justify-content:center}
+.add-overlay.show{display:flex}
+.add-modal{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r);
+  width:92%;max-width:560px;overflow:hidden}
+.add-header{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;
+  border-bottom:1px solid var(--border)}
+.add-header h3{font-size:16px;font-weight:600}
+.add-close{font-size:22px;color:var(--text-sec);padding:4px 8px;line-height:1;cursor:pointer}
+.add-close:hover{color:var(--text)}
+.add-body{padding:16px 18px;display:flex;flex-direction:column;gap:12px}
+.add-row{display:flex;gap:10px;align-items:center}
+.add-row label{font-size:12px;color:var(--text-sec);min-width:80px}
+.add-row input,.add-row select{flex:1;background:var(--bg-surface);border:1px solid var(--border);
+  border-radius:4px;padding:7px 10px;color:var(--text);font-size:13px;font-family:var(--mono)}
+.add-row input:focus,.add-row select:focus{outline:none;border-color:var(--yellow)}
+.add-chain-entry{background:var(--bg-surface);border:1px solid var(--border);border-radius:6px;
+  padding:10px;display:flex;flex-direction:column;gap:6px}
+.add-chain-row{display:flex;gap:6px;align-items:center}
+.add-chain-row input,.add-chain-row select{flex:1;background:var(--bg);border:1px solid var(--border);
+  border-radius:4px;padding:5px 8px;color:var(--text);font-size:12px;font-family:var(--mono)}
+.add-chain-row select{max-width:120px}
+.add-chain-rm{color:var(--red);cursor:pointer;font-size:16px;padding:0 4px}
+.add-chain-rm:hover{opacity:.7}
+.add-actions{display:flex;gap:8px;justify-content:flex-end;padding:12px 18px;border-top:1px solid var(--border)}
+.add-btn{padding:8px 20px;border-radius:6px;font-size:13px;font-weight:500;cursor:pointer;
+  border:1px solid var(--border);transition:all .2s}
+.add-btn-primary{background:var(--yellow);color:#0b0e11;border-color:var(--yellow)}
+.add-btn-primary:hover{opacity:.85}
+.add-btn-secondary:hover{border-color:var(--text-tri)}
+.add-chain-add{padding:5px 12px;border-radius:4px;font-size:12px;border:1px dashed var(--border);
+  color:var(--text-sec);cursor:pointer;transition:all .2s;align-self:flex-start}
+.add-chain-add:hover{border-color:var(--yellow);color:var(--yellow)}
+.custom-token-tag{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;
+  border-radius:4px;font-size:11px;background:var(--blue-bg);color:var(--blue)}
+.custom-del{cursor:pointer;color:var(--red);font-size:13px;margin-left:4px}
+.custom-del:hover{opacity:.7}
+.add-token-btn{padding:6px 14px;border-radius:6px;font-size:12px;font-weight:500;
+  background:var(--bg-card);border:1px solid var(--border);color:var(--text-sec);
+  cursor:pointer;transition:all .2s}
+.add-token-btn:hover{border-color:var(--yellow);color:var(--yellow)}
+
+/* ───── K-line Modal ───── */
+.kline-overlay{position:fixed;inset:0;z-index:100;background:rgba(0,0,0,.7);display:none;
+  align-items:center;justify-content:center}
+.kline-overlay.show{display:flex}
+.kline-modal{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r);
+  width:92%;max-width:860px;overflow:hidden}
+.kline-header{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;
+  border-bottom:1px solid var(--border)}
+.kline-header h3{font-size:16px;font-weight:600}
+.kline-close{font-size:22px;color:var(--text-sec);padding:4px 8px;line-height:1}
+.kline-close:hover{color:var(--text)}
+.kline-bars{display:flex;gap:4px;padding:10px 18px;border-bottom:1px solid var(--border)}
+.kline-bar{padding:4px 10px;border-radius:4px;font-size:12px;border:1px solid var(--border);
+  color:var(--text-sec);transition:all .2s}
+.kline-bar:hover{border-color:var(--text-tri);color:var(--text)}
+.kline-bar.active{background:var(--yellow);color:#0b0e11;border-color:var(--yellow);font-weight:500}
+.kline-body{padding:16px}
+.kline-canvas{width:100%;height:400px;display:block;cursor:crosshair}
+.kline-info{text-align:center;padding:80px 20px;color:var(--text-tri);font-size:14px}
+
+/* ───── History ───── */
+.history-list{display:flex;flex-direction:column;gap:8px}
+.history-item{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r);
+  padding:14px 18px;display:flex;align-items:center;justify-content:space-between;
+  transition:border-color .2s}
+.history-item:hover{border-color:var(--text-tri)}
+.history-time{font-size:13px;color:var(--text-sec);min-width:180px;font-family:var(--mono)}
+.history-stats{display:flex;gap:16px;font-size:13px}
+.history-stats span{display:flex;align-items:center;gap:4px}
+
+/* ───── Empty & Loading ───── */
+.empty{text-align:center;padding:60px 20px;color:var(--text-tri)}
+.empty svg{margin-bottom:12px;opacity:.4}
+.empty p{font-size:14px}
+.loading-bar{height:2px;background:var(--bg-card);overflow:hidden;border-radius:1px}
+.loading-bar::after{content:'';display:block;height:100%;width:30%;background:var(--yellow);
+  animation:slide 1.5s ease-in-out infinite}
+@keyframes slide{0%{transform:translateX(-100%)}100%{transform:translateX(400%)}}
+
+/* ───── Footer ───── */
+footer{text-align:center;padding:20px;font-size:12px;color:var(--text-tri);
+  border-top:1px solid var(--border);margin-top:32px}
+
+/* ───── Responsive ───── */
+@media(max-width:768px){
+  header{flex-direction:column;gap:10px}
+  .stats{grid-template-columns:repeat(2,1fr)}
+  .tab{padding:8px 14px;font-size:13px}
+}
+
+/* ───── Path Management ───── */
+.path-toolbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.path-count{font-size:13px;color:var(--text-sec)}
+.path-tbl-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:var(--r)}
+.path-toggle{width:36px;height:20px;border-radius:10px;background:var(--border);position:relative;
+  cursor:pointer;transition:background .2s;border:none;padding:0}
+.path-toggle::after{content:'';position:absolute;top:2px;left:2px;width:16px;height:16px;
+  border-radius:50%;background:var(--text-sec);transition:all .2s}
+.path-toggle.on{background:var(--green)}
+.path-toggle.on::after{left:18px;background:#fff}
+.path-del{color:var(--red);cursor:pointer;font-size:15px;padding:2px 6px;border:none;background:none}
+.path-del:hover{opacity:.7}
+
+/* ───── Add Path Modal ───── */
+.addpath-overlay{position:fixed;inset:0;z-index:100;background:rgba(0,0,0,.7);display:none;
+  align-items:center;justify-content:center}
+.addpath-overlay.show{display:flex}
+.addpath-modal{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r);
+  width:92%;max-width:580px;overflow:hidden}
+.addpath-header{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;
+  border-bottom:1px solid var(--border)}
+.addpath-header h3{font-size:16px;font-weight:600}
+.addpath-close{font-size:22px;color:var(--text-sec);padding:4px 8px;line-height:1;cursor:pointer}
+.addpath-close:hover{color:var(--text)}
+.addpath-body{padding:16px 18px;display:flex;flex-direction:column;gap:12px}
+.addpath-section{background:var(--bg-surface);border:1px solid var(--border);border-radius:6px;
+  padding:12px;display:flex;flex-direction:column;gap:8px}
+.addpath-section-title{font-size:12px;font-weight:600;color:var(--yellow);text-transform:uppercase;
+  letter-spacing:.04em}
+.addpath-row{display:flex;gap:8px;align-items:center}
+.addpath-row label{font-size:12px;color:var(--text-sec);min-width:60px}
+.addpath-row input,.addpath-row select{flex:1;background:var(--bg);border:1px solid var(--border);
+  border-radius:4px;padding:6px 10px;color:var(--text);font-size:13px;font-family:var(--mono)}
+.addpath-row input:focus,.addpath-row select:focus{outline:none;border-color:var(--yellow)}
+.addpath-actions{display:flex;gap:8px;justify-content:flex-end;padding:12px 18px;border-top:1px solid var(--border)}
+.addpath-arrow{text-align:center;font-size:20px;color:var(--yellow);margin:4px 0}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <svg viewBox="0 0 32 32" fill="none"><rect width="32" height="32" rx="6" fill="#FCD535"/>
+    <path d="M10 10h4.5v4.5H10V10zm7.5 0H22v4.5h-4.5V10zM10 17.5h4.5V22H10v-4.5zm7.5 0H22V22h-4.5v-4.5z" fill="#0b0e11"/></svg>
+    <h1>OKX-<span>Claw</span></h1>
+    <span class="badge" id="badge-text">Arbitrage Scanner</span>
+  </div>
+  <div class="header-r">
+    <div><span class="status-dot off" id="dot"></span><span id="status-text">--</span></div>
+    <div id="next-scan"></div>
+    <button class="lang-btn" id="lang-toggle" title="Switch language">EN</button>
+  </div>
+</header>
+
+<div class="wrap">
+  <!-- Loading bar -->
+  <div class="loading-bar" id="loader" style="display:none"></div>
+
+  <!-- Stats -->
+  <section class="stats">
+    <div class="stat blue"><div class="stat-label" data-i18n="stat_tokens">--</div>
+      <div class="stat-val" id="s-tokens">--</div><div class="stat-sub" id="s-chains"></div></div>
+    <div class="stat"><div class="stat-label" data-i18n="stat_opps">--</div>
+      <div class="stat-val" id="s-total">--</div><div class="stat-sub" data-i18n="stat_opps_sub">--</div></div>
+    <div class="stat green"><div class="stat-label" data-i18n="stat_valid">--</div>
+      <div class="stat-val" id="s-valid">--</div><div class="stat-sub" data-i18n="stat_valid_sub">--</div></div>
+    <div class="stat yellow"><div class="stat-label" data-i18n="stat_blocked">--</div>
+      <div class="stat-val" id="s-block">--</div><div class="stat-sub" data-i18n="stat_blocked_sub">--</div></div>
+  </section>
+
+  <!-- Tabs -->
+  <nav class="tabs">
+    <button class="tab active" data-tab="opportunities" data-i18n="tab_opps">--</button>
+    <button class="tab" data-tab="prices" data-i18n="tab_prices">--</button>
+    <button class="tab" data-tab="paths" data-i18n="tab_paths">--</button>
+    <button class="tab" data-tab="history" data-i18n="tab_history">--</button>
+  </nav>
+
+  <!-- Opportunities Panel -->
+  <div class="panel active" id="p-opportunities">
+    <div class="filters">
+      <button class="flt active" data-f="all" data-i18n="flt_all">--</button>
+      <button class="flt" data-f="validated" data-i18n="flt_valid">--</button>
+      <button class="flt" data-f="blocked" data-i18n="flt_blocked">--</button>
+      <button class="flt" data-f="failed" data-i18n="flt_failed">--</button>
+    </div>
+    <div class="tbl-wrap">
+      <table>
+        <thead>
+          <tr id="opp-thead"></tr>
+        </thead>
+        <tbody id="opp-body"></tbody>
+      </table>
+    </div>
+    <div class="empty" id="opp-empty" style="display:none">
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
+      <p id="opp-empty-text">--</p>
+    </div>
+  </div>
+
+  <!-- Prices Panel -->
+  <div class="panel" id="p-prices">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap" id="custom-tags"></div>
+      <button class="add-token-btn" id="btn-add-token" onclick="openAddToken()">+ <span data-i18n="add_token">添加代币</span></button>
+    </div>
+    <div class="price-grid" id="price-grid"></div>
+    <div class="empty" id="price-empty" style="display:none">
+      <p data-i18n="empty_prices">--</p>
+    </div>
+  </div>
+
+  <!-- Cross-Chain Paths Panel -->
+  <div class="panel" id="p-paths">
+    <div class="path-toolbar">
+      <span class="path-count" id="path-count"></span>
+      <button class="add-token-btn" id="btn-add-path" onclick="openAddPath()">+ <span data-i18n="path_add">添加路径</span></button>
+    </div>
+    <div class="path-tbl-wrap">
+      <table>
+        <thead>
+          <tr id="path-thead"></tr>
+        </thead>
+        <tbody id="path-body"></tbody>
+      </table>
+    </div>
+    <div class="empty" id="path-empty" style="display:none">
+      <p data-i18n="path_empty">暂无跨链路径，点击"添加路径"开始</p>
+    </div>
+  </div>
+
+  <!-- History Panel -->
+  <div class="panel" id="p-history">
+    <div class="history-list" id="hist-list"></div>
+    <div class="empty" id="hist-empty" style="display:none">
+      <p data-i18n="empty_history">--</p>
+    </div>
+  </div>
+</div>
+
+<!-- K-line Modal -->
+<div class="kline-overlay" id="kline-overlay">
+  <div class="kline-modal">
+    <div class="kline-header">
+      <h3 id="kline-title">--</h3>
+      <div style="display:flex;align-items:center;gap:6px">
+        <button class="kline-bar" id="kline-zoom-out" title="Zoom Out">−</button>
+        <button class="kline-bar" id="kline-zoom-reset" title="Reset">1:1</button>
+        <button class="kline-bar" id="kline-zoom-in" title="Zoom In">+</button>
+        <button class="kline-close" id="kline-close">&times;</button>
+      </div>
+    </div>
+    <div class="kline-bars" id="kline-bars">
+      <button class="kline-bar" data-bar="1m">1m</button>
+      <button class="kline-bar" data-bar="5m">5m</button>
+      <button class="kline-bar" data-bar="15m">15m</button>
+      <button class="kline-bar active" data-bar="1H">1H</button>
+      <button class="kline-bar" data-bar="4H">4H</button>
+      <button class="kline-bar" data-bar="1D">1D</button>
+    </div>
+    <div class="kline-body">
+      <canvas id="kline-canvas" class="kline-canvas"></canvas>
+      <div class="kline-info" id="kline-info" style="display:none">--</div>
+    </div>
+  </div>
+</div>
+
+<!-- Add Token Modal -->
+<div class="add-overlay" id="add-overlay">
+  <div class="add-modal">
+    <div class="add-header">
+      <h3 data-i18n="add_token_title">添加自定义代币</h3>
+      <span class="add-close" onclick="closeAddToken()">&times;</span>
+    </div>
+    <div class="add-body">
+      <div class="add-row">
+        <label data-i18n="add_symbol">Symbol</label>
+        <input id="add-sym" placeholder="e.g. DOGE" maxlength="12">
+      </div>
+      <div class="add-row">
+        <label data-i18n="add_cex_pair">CEX 交易对</label>
+        <input id="add-cex" placeholder="e.g. DOGE-USDT">
+      </div>
+      <div style="font-size:12px;color:var(--text-sec);margin-top:4px" data-i18n="add_chains_label">链上合约配置（至少一条链）：</div>
+      <div id="add-chains"></div>
+      <button class="add-chain-add" onclick="addChainEntry()">+ <span data-i18n="add_chain_btn">添加链</span></button>
+    </div>
+    <div class="add-actions">
+      <button class="add-btn add-btn-secondary" onclick="closeAddToken()" data-i18n="add_cancel">取消</button>
+      <button class="add-btn add-btn-primary" onclick="submitAddToken()" data-i18n="add_confirm">确认添加</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add Path Modal -->
+<div class="addpath-overlay" id="addpath-overlay">
+  <div class="addpath-modal">
+    <div class="addpath-header">
+      <h3 data-i18n="path_add_title">添加跨链路径</h3>
+      <span class="addpath-close" onclick="closeAddPath()">&times;</span>
+    </div>
+    <div class="addpath-body">
+      <div class="addpath-section">
+        <div class="addpath-section-title" data-i18n="path_from">源链（买入）</div>
+        <div class="addpath-row">
+          <label data-i18n="path_chain">链</label>
+          <select id="ap-from-chain"></select>
+        </div>
+        <div class="addpath-row">
+          <label data-i18n="path_token">代币</label>
+          <input id="ap-from-symbol" placeholder="e.g. USDC" value="USDC">
+        </div>
+        <div class="addpath-row">
+          <label data-i18n="add_addr">合约</label>
+          <input id="ap-from-addr" placeholder="0x...">
+        </div>
+        <div class="addpath-row">
+          <label data-i18n="add_decimals">精度</label>
+          <input id="ap-from-dec" type="number" value="6" style="max-width:80px">
+          <label data-i18n="add_amount" style="min-width:40px">数量</label>
+          <input id="ap-from-amt" placeholder="e.g. 10000000 (10 USDC)">
+        </div>
+      </div>
+      <div class="addpath-arrow">↓ 跨链 ↓</div>
+      <div class="addpath-section">
+        <div class="addpath-section-title" data-i18n="path_to">目标链（接收）</div>
+        <div class="addpath-row">
+          <label data-i18n="path_chain">链</label>
+          <select id="ap-to-chain"></select>
+        </div>
+        <div class="addpath-row">
+          <label data-i18n="path_token">代币</label>
+          <input id="ap-to-symbol" placeholder="e.g. SUSHI">
+        </div>
+        <div class="addpath-row">
+          <label data-i18n="add_addr">合约</label>
+          <input id="ap-to-addr" placeholder="0x...">
+        </div>
+        <div class="addpath-row">
+          <label data-i18n="add_decimals">精度</label>
+          <input id="ap-to-dec" type="number" value="18" style="max-width:80px">
+        </div>
+      </div>
+      <div style="font-size:12px;color:var(--text-sec)" data-i18n="path_sell_note">卖出代币默认为目标链上的 USDC（可修改）</div>
+      <div class="addpath-row">
+        <label data-i18n="path_sell">卖出</label>
+        <input id="ap-sell-symbol" placeholder="USDC" value="USDC">
+        <input id="ap-sell-addr" placeholder="0x... (auto-fill USDC)">
+        <input id="ap-sell-dec" type="number" value="6" style="max-width:60px">
+      </div>
+    </div>
+    <div class="addpath-actions">
+      <button class="add-btn add-btn-secondary" onclick="closeAddPath()" data-i18n="add_cancel">取消</button>
+      <button class="add-btn add-btn-primary" onclick="submitAddPath()" data-i18n="add_confirm">确认添加</button>
+    </div>
+  </div>
+</div>
+
+<footer id="footer-text">--</footer>
+
+<script>
+/* ───── i18n ───── */
+const I18N = {
+  zh: {
+    badge:          '套利扫描器',
+    connecting:     '连接中...',
+    scanning:       '扫描中...',
+    last:           '上次: ',
+    next_scan:      '下次扫描: ',
+    stat_tokens:    '监控代币',
+    stat_opps:      '机会',
+    stat_opps_sub:  '本轮扫描发现',
+    stat_valid:     '已验证',
+    stat_valid_sub: '扣除成本后有利可图',
+    stat_blocked:   '已阻止',
+    stat_blocked_sub:'充值/提现暂停',
+    tab_opps:       '套利机会',
+    tab_prices:     '价格矩阵',
+    tab_history:    '历史记录',
+    flt_all:        '全部',
+    flt_valid:      '已验证',
+    flt_blocked:    '已阻止',
+    flt_failed:     '失败',
+    th_token:       '代币',
+    th_type:        '类型',
+    th_buy:         '买入',
+    th_buy_price:   '买入价',
+    th_sell:        '卖出',
+    th_sell_price:  '卖出价',
+    th_spread:      '价差',
+    th_net_pct:     '净利%',
+    th_net:         '净利润',
+    th_gas:         'Gas',
+    th_bridge:      '桥接费',
+    th_dw:          '充/提',
+    th_status:      '状态',
+    type_cc:        '跨链',
+    type_dc:        'DEX↔CEX',
+    empty_wait:     '等待首次扫描...',
+    empty_filter:   '没有匹配该筛选条件的机会',
+    empty_prices:   '暂无价格数据',
+    empty_history:  '暂无历史记录',
+    total:          '总计',
+    valid:          '有效',
+    blocked:        '阻止',
+    fail:           '失败',
+    chains_sub:     ' 个代币覆盖 7 条链',
+    footer:         'OKX-Claw \u00a9 2026 \u2014 跨链 & DEX-CEX 套利扫描器 \u2014 不构成投资建议',
+    ago_s:          '秒前',
+    ago_m:          '分钟前',
+    ago_h:          '小时前',
+    kline_loading:  '加载K线数据...',
+    kline_nodata:   '暂无K线数据',
+    kline_error:    '加载失败',
+    kline_hint:     '点击查看K线',
+    add_token:      '添加代币',
+    add_token_title:'添加自定义代币',
+    add_symbol:     '代币名称',
+    add_cex_pair:   'CEX交易对',
+    add_chains_label:'链上合约配置（至少一条链）：',
+    add_chain_btn:  '添加链',
+    add_cancel:     '取消',
+    add_confirm:    '确认添加',
+    add_addr:       '合约地址',
+    add_decimals:   '精度',
+    add_amount:     '扫描数量',
+    add_success:    '添加成功！下次扫描生效',
+    add_error:      '添加失败',
+    custom_label:   '自定义',
+    tab_paths:      '跨链路径',
+    path_add:       '添加路径',
+    path_add_title: '添加跨链路径',
+    path_empty:     '暂无跨链路径，点击"添加路径"开始',
+    path_from:      '源链（买入）',
+    path_to:        '目标链（接收）',
+    path_chain:     '链',
+    path_token:     '代币',
+    path_sell:      '卖出',
+    path_sell_note: '卖出代币默认为目标链上的 USDC（可修改）',
+    path_th_label:  '路径',
+    path_th_from:   '源',
+    path_th_to:     '目标',
+    path_th_amount: '数量',
+    path_th_enabled:'状态',
+    path_th_action: '操作',
+    path_count:     '条路径',
+    path_success:   '添加成功！下次扫描生效',
+    path_error:     '添加失败',
+    type_ccp:       '跨链路径',
+  },
+  en: {
+    badge:          'Arbitrage Scanner',
+    connecting:     'Connecting...',
+    scanning:       'Scanning...',
+    last:           'Last: ',
+    next_scan:      'Next scan: ',
+    stat_tokens:    'Tokens Monitored',
+    stat_opps:      'Opportunities',
+    stat_opps_sub:  'found this scan',
+    stat_valid:     'Validated',
+    stat_valid_sub: 'profitable after costs',
+    stat_blocked:   'Blocked',
+    stat_blocked_sub:'D/W suspended',
+    tab_opps:       'Opportunities',
+    tab_prices:     'Price Matrix',
+    tab_history:    'History',
+    flt_all:        'All',
+    flt_valid:      'Validated',
+    flt_blocked:    'Blocked',
+    flt_failed:     'Failed',
+    th_token:       'Token',
+    th_type:        'Type',
+    th_buy:         'Buy At',
+    th_buy_price:   'Buy $',
+    th_sell:        'Sell At',
+    th_sell_price:  'Sell $',
+    th_spread:      'Spread',
+    th_net_pct:     'Net%',
+    th_net:         'Net Profit',
+    th_gas:         'Gas',
+    th_bridge:      'Bridge',
+    th_dw:          'D/W',
+    th_status:      'Status',
+    type_cc:        'Cross-chain',
+    type_dc:        'DEX\u2194CEX',
+    empty_wait:     'Waiting for first scan...',
+    empty_filter:   'No opportunities match this filter',
+    empty_prices:   'No price data yet',
+    empty_history:  'No history yet',
+    total:          'total',
+    valid:          'valid',
+    blocked:        'blocked',
+    fail:           'fail',
+    chains_sub:     ' tokens across 7 chains',
+    footer:         'OKX-Claw \u00a9 2026 \u2014 Cross-chain & DEX-CEX Arbitrage Scanner \u2014 Not financial advice',
+    ago_s:          's ago',
+    ago_m:          'm ago',
+    ago_h:          'h ago',
+    kline_loading:  'Loading candles...',
+    kline_nodata:   'No candle data available',
+    kline_error:    'Failed to load',
+    kline_hint:     'Click for chart',
+    add_token:      'Add Token',
+    add_token_title:'Add Custom Token',
+    add_symbol:     'Symbol',
+    add_cex_pair:   'CEX Pair',
+    add_chains_label:'Chain contract config (at least one):',
+    add_chain_btn:  'Add Chain',
+    add_cancel:     'Cancel',
+    add_confirm:    'Add Token',
+    add_addr:       'Contract',
+    add_decimals:   'Decimals',
+    add_amount:     'Scan Amount',
+    add_success:    'Added! Takes effect on next scan',
+    add_error:      'Failed to add',
+    custom_label:   'Custom',
+    tab_paths:      'Cross-Chain Paths',
+    path_add:       'Add Path',
+    path_add_title: 'Add Cross-Chain Path',
+    path_empty:     'No paths configured. Click "Add Path" to start',
+    path_from:      'Source Chain (Buy)',
+    path_to:        'Dest Chain (Receive)',
+    path_chain:     'Chain',
+    path_token:     'Token',
+    path_sell:      'Sell',
+    path_sell_note: 'Sell token defaults to USDC on dest chain (editable)',
+    path_th_label:  'Path',
+    path_th_from:   'From',
+    path_th_to:     'To',
+    path_th_amount: 'Amount',
+    path_th_enabled:'Status',
+    path_th_action: 'Action',
+    path_count:     'paths',
+    path_success:   'Added! Takes effect on next scan',
+    path_error:     'Failed to add',
+    type_ccp:       'CC Path',
+  }
+};
+
+let lang = localStorage.getItem('okx-claw-lang') || 'zh';
+const t = (k) => I18N[lang]?.[k] || I18N.en[k] || k;
+
+function setLang(l) {
+  lang = l;
+  localStorage.setItem('okx-claw-lang', l);
+  document.documentElement.lang = l === 'zh' ? 'zh-CN' : 'en';
+  $('#lang-toggle').textContent = l === 'zh' ? 'EN' : '中文';
+  applyI18n();
+  renderAll();
+}
+
+function applyI18n() {
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    el.textContent = t(el.dataset.i18n);
+  });
+  $('#badge-text').textContent = t('badge');
+  $('#footer-text').innerHTML = t('footer');
+  renderThead();
+  renderPathThead();
+}
+
+function renderThead() {
+  const keys = ['th_token','th_type','th_buy','th_buy_price','th_sell','th_sell_price',
+    'th_spread','th_net_pct','th_net','th_gas','th_bridge','th_dw','th_status'];
+  const numCols = new Set(['th_buy_price','th_sell_price','th_spread','th_net_pct','th_net','th_gas','th_bridge']);
+  $('#opp-thead').innerHTML = keys.map(k =>
+    `<th${numCols.has(k) ? ' class="num"' : ''}>${t(k)}</th>`
+  ).join('');
+}
+
+/* ───── State ───── */
+let data = null;
+let histData = [];
+let activeFilter = 'all';
+let countdown = 0;
+let countdownTimer = null;
+const REFRESH_MS = 5000;
+const SCAN_INTERVAL = 120;
+
+/* ───── Formatting ───── */
+const $  = (s) => document.querySelector(s);
+const $$ = (s) => document.querySelectorAll(s);
+const fmt = (n, d=2) => n == null ? '--' : Number(n).toFixed(d);
+const fmtK = (n) => {
+  if (n == null) return '--';
+  const v = Number(n);
+  if (Math.abs(v) >= 1000) return '$' + (v/1000).toFixed(1) + 'k';
+  return '$' + v.toFixed(2);
+};
+const fmtGas = (o) => {
+  return '$' + fmt(o.gasCostUsd);
+};
+
+function timeAgo(iso) {
+  if (!iso) return '--';
+  const sec = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+  if (sec < 60) return sec + t('ago_s');
+  if (sec < 3600) return Math.floor(sec/60) + t('ago_m');
+  return Math.floor(sec/3600) + t('ago_h');
+}
+
+function fmtTime(iso) {
+  if (!iso) return '--';
+  const d = new Date(iso);
+  return d.toLocaleTimeString(lang === 'zh' ? 'zh-CN' : 'en-US',
+    {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+}
+
+/* ───── API ───── */
+async function fetchStatus() {
+  try {
+    const r = await fetch('/api/status');
+    data = await r.json();
+    updateUI();
+  } catch { /* retry on next interval */ }
+}
+
+async function fetchHistory() {
+  try {
+    const r = await fetch('/api/history');
+    histData = await r.json();
+    renderHistory();
+  } catch {}
+}
+
+/* ───── UI Updates ───── */
+function updateUI() {
+  if (!data) return;
+  const d = data;
+  const dot = $('#dot');
+  const stxt = $('#status-text');
+
+  // Status
+  if (d.scanning) {
+    dot.className = 'status-dot scanning';
+    stxt.textContent = t('scanning');
+    $('#loader').style.display = 'block';
+  } else {
+    dot.className = 'status-dot live';
+    stxt.textContent = t('last') + fmtTime(d.timestamp);
+    $('#loader').style.display = 'none';
+    resetCountdown();
+  }
+
+  // Stats
+  const tokenCount = d.tokens?.length || 0;
+  $('#s-tokens').textContent = tokenCount;
+  $('#s-chains').textContent = tokenCount + t('chains_sub');
+  $('#s-total').textContent = d.summary?.total ?? '--';
+  $('#s-valid').textContent = d.summary?.validated ?? '--';
+  $('#s-block').textContent = d.summary?.blocked ?? '--';
+
+  renderOpportunities();
+  renderPrices();
+  fetchHistory();
+}
+
+function renderAll() {
+  updateUI();
+}
+
+/* ───── Opportunities Table ───── */
+function renderOpportunities() {
+  const tbody = $('#opp-body');
+  const empty = $('#opp-empty');
+  let opps = data?.opportunities || [];
+
+  if (activeFilter === 'validated') opps = opps.filter(o => o.validated);
+  else if (activeFilter === 'blocked') opps = opps.filter(o => !o.validated && o.detail?.includes('BLOCKED'));
+  else if (activeFilter === 'failed') opps = opps.filter(o => !o.validated && !o.detail?.includes('BLOCKED'));
+
+  if (opps.length === 0) {
+    tbody.innerHTML = '';
+    empty.style.display = 'block';
+    $('#opp-empty-text').textContent = data?.timestamp ? t('empty_filter') : t('empty_wait');
+    return;
+  }
+  empty.style.display = 'none';
+
+  // Sort: validated first, then by spread desc
+  opps.sort((a,b) => {
+    if (a.validated !== b.validated) return b.validated ? 1 : -1;
+    return b.spreadPct - a.spreadPct;
+  });
+
+  tbody.innerHTML = opps.map(o => {
+    const dwStr = o.dwUnknown ? '<span class="muted">?/?</span>'
+      : `<span class="${o.canDeposit?'pos':'neg'}">${o.canDeposit?'Y':'N'}</span>/<span class="${o.canWithdraw?'pos':'neg'}">${o.canWithdraw?'Y':'N'}</span>`;
+
+    let tag = '';
+    if (o.validated) tag = '<span class="tag tag-pass">PASS</span>';
+    else if (o.detail?.includes('BLOCKED')) tag = `<span class="tag tag-block">${t('flt_blocked').toUpperCase()}</span>`;
+    else if (o.detail?.includes('SKIP')) tag = '<span class="tag tag-skip">SKIP</span>';
+    else tag = `<span class="tag tag-fail">${t('flt_failed').toUpperCase()}</span>`;
+
+    const spreadCls = o.spreadPct >= 5 ? 'pos' : o.spreadPct >= 3 ? 'warn' : '';
+    const netPct = o.netProfitPct || ((o.netProfitUsd / 1000) * 100);
+    const netCls = netPct >= 5 ? 'pos' : netPct > 0 ? 'warn' : netPct < 0 ? 'neg' : '';
+    const typeLabel = o.type === 'cross-chain' ? t('type_cc') : o.type === 'cross-chain-path' ? t('type_ccp') : t('type_dc');
+
+    return `<tr>
+      <td><strong>${o.token}</strong></td>
+      <td>${typeLabel}</td>
+      <td>${o.buyAt}</td>
+      <td class="num">$${fmt(o.buyPrice)}</td>
+      <td>${o.sellAt}</td>
+      <td class="num">$${fmt(o.sellPrice)}</td>
+      <td class="num ${spreadCls}">${fmt(o.spreadPct,3)}%</td>
+      <td class="num ${netCls}">${fmt(netPct,2)}%</td>
+      <td class="num ${netCls}">${fmtK(o.netProfitUsd)}</td>
+      <td class="num muted">${fmtGas(o)}</td>
+      <td class="num muted">$${fmt(o.bridgeFeeUsd||0)}</td>
+      <td>${dwStr}</td>
+      <td>${tag}</td>
+    </tr>`;
+  }).join('');
+}
+
+/* ───── Price Matrix ───── */
+function renderPrices() {
+  const grid = $('#price-grid');
+  const empty = $('#price-empty');
+  const dex = data?.dexPrices || {};
+  const cex = data?.cexPrices || {};
+  const symbols = Object.keys(dex);
+
+  if (symbols.length === 0) {
+    grid.innerHTML = '';
+    empty.style.display = 'block';
+    return;
+  }
+  empty.style.display = 'none';
+
+  grid.innerHTML = symbols.map(sym => {
+    const entries = dex[sym] || [];
+    const cexP = cex[sym];
+    const avgPrice = entries.reduce((s,e) => s + e.price, 0) / entries.length;
+
+    const rows = entries.map(e => {
+      const diff = avgPrice > 0 ? ((e.price - avgPrice) / avgPrice) * 100 : 0;
+      const cls = diff > 0.1 ? 'pos' : diff < -0.1 ? 'neg' : 'muted';
+      const ci = e.chainIndex || '';
+      const addr = e.address || '';
+      return `<div class="price-row" onclick="openKline('${sym}','${e.chain}','${ci}','${addr}')">
+        <span class="price-chain">${e.chain}</span>
+        <span class="price-val">$${fmt(e.price, e.price > 100 ? 2 : 4)}</span>
+        <span class="price-diff ${cls}">${diff >= 0 ? '+' : ''}${diff.toFixed(3)}%</span>
+        <span class="price-kicon">K</span>
+      </div>`;
+    }).join('');
+
+    const cexRow = cexP ? `<div class="price-row" style="border-top:1px solid var(--border);cursor:default">
+      <span class="price-chain" style="color:var(--yellow)">CEX (OKX)</span>
+      <span class="price-val">$${fmt(cexP, cexP > 100 ? 2 : 4)}</span>
+      <span class="price-diff muted">--</span>
+      <span class="price-kicon"></span>
+    </div>` : '';
+
+    // Pick first chain entry for sparkline
+    const e0 = entries[0];
+    const sparkId = `spark-${sym}`;
+
+    return `<div class="price-card">
+      <div class="price-card-head">
+        <h3>${sym}</h3>
+        <span class="price-card-cex">${cexP ? 'CEX $'+fmt(cexP, cexP>100?2:4) : ''}</span>
+      </div>
+      <div class="price-card-body">${rows}${cexRow}</div>
+      <div class="price-card-chart" onclick="openKline('${sym}','${e0?.chain||''}','${e0?.chainIndex||''}','${e0?.address||''}')">
+        <canvas class="spark-canvas" id="${sparkId}"
+          data-chain="${e0?.chainIndex||''}" data-addr="${e0?.address||''}"></canvas>
+      </div>
+    </div>`;
+  }).join('');
+
+  // Load sparklines asynchronously
+  requestAnimationFrame(() => loadSparklines());
+}
+
+/* ───── Sparkline Loader ───── */
+const sparkCache = new Map(); // key -> candles
+
+async function loadSparklines() {
+  const canvases = document.querySelectorAll('.spark-canvas');
+  for (const c of canvases) {
+    const ci = c.dataset.chain;
+    const addr = c.dataset.addr;
+    if (!ci || !addr) continue;
+    const key = `${ci}:${addr}`;
+    if (sparkCache.has(key)) {
+      drawSparkline(c, sparkCache.get(key));
+      continue;
+    }
+    // Fetch in background, stagger to avoid rate limit
+    fetchSparkCandles(c, ci, addr, key);
+  }
+}
+
+async function fetchSparkCandles(canvas, chainIndex, address, key) {
+  try {
+    const params = new URLSearchParams({ chainIndex, address, bar: '1H', limit: '48' });
+    const r = await fetch('/api/candles?' + params);
+    const candles = await r.json();
+    if (candles && candles.length > 2) {
+      sparkCache.set(key, candles);
+      drawSparkline(canvas, candles);
+    } else {
+      drawSparkEmpty(canvas);
+    }
+  } catch {
+    drawSparkEmpty(canvas);
+  }
+}
+
+function drawSparkline(canvas, candles) {
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width * dpr;
+  canvas.height = rect.height * dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  const W = rect.width, H = rect.height;
+  ctx.clearRect(0, 0, W, H);
+
+  candles.sort((a, b) => a.ts - b.ts);
+  const len = candles.length;
+  const pad = 2;
+
+  let minP = Infinity, maxP = -Infinity;
+  for (const c of candles) {
+    if (c.low < minP) minP = c.low;
+    if (c.high > maxP) maxP = c.high;
+  }
+  const range = maxP - minP || 1;
+  minP -= range * 0.05;
+  maxP += range * 0.05;
+  const totalRange = maxP - minP;
+  const yOf = (p) => pad + (H - 2*pad) * (1 - (p - minP) / totalRange);
+
+  // Mini candles
+  const candleW = Math.max(1, Math.floor((W - 2*pad) / len) - 1);
+  for (let i = 0; i < len; i++) {
+    const c = candles[i];
+    const x = pad + (i / Math.max(len-1, 1)) * (W - 2*pad) - candleW / 2;
+    const isGreen = c.close >= c.open;
+    const color = isGreen ? '#0ecb81' : '#f6465d';
+
+    // Wick
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 0.5;
+    const wx = x + candleW / 2;
+    ctx.beginPath(); ctx.moveTo(wx, yOf(c.high)); ctx.lineTo(wx, yOf(c.low)); ctx.stroke();
+
+    // Body
+    ctx.fillStyle = color;
+    const bTop = yOf(Math.max(c.open, c.close));
+    const bBot = yOf(Math.min(c.open, c.close));
+    ctx.fillRect(x, bTop, candleW, Math.max(0.5, bBot - bTop));
+  }
+
+  // Price label
+  const lastC = candles[len-1];
+  const change = ((lastC.close - candles[0].open) / candles[0].open) * 100;
+  ctx.fillStyle = change >= 0 ? '#0ecb81' : '#f6465d';
+  ctx.font = '10px monospace';
+  ctx.textAlign = 'right';
+  ctx.fillText((change >= 0 ? '+' : '') + change.toFixed(2) + '%', W - 4, 12);
+
+  // Period label
+  ctx.fillStyle = '#5e6673';
+  ctx.font = '9px sans-serif';
+  ctx.textAlign = 'left';
+  ctx.fillText('48H', 4, 12);
+}
+
+/* ───── History ───── */
+function renderHistory() {
+  const list = $('#hist-list');
+  const empty = $('#hist-empty');
+  if (!histData || histData.length === 0) {
+    list.innerHTML = '';
+    empty.style.display = 'block';
+    return;
+  }
+  empty.style.display = 'none';
+
+  // Show newest first
+  const items = histData.slice().reverse().slice(0, 50);
+  list.innerHTML = items.map(h => {
+    const s = h.summary || {};
+    return `<div class="history-item">
+      <span class="history-time">${fmtTime(h.timestamp)} &nbsp; <span class="muted">${timeAgo(h.timestamp)}</span></span>
+      <div class="history-stats">
+        <span>${s.total || 0} ${t('total')}</span>
+        <span class="pos">${s.validated || 0} ${t('valid')}</span>
+        <span class="warn">${s.blocked || 0} ${t('blocked')}</span>
+        <span class="neg">${s.failed || 0} ${t('fail')}</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+/* ───── Countdown ───── */
+function resetCountdown() {
+  countdown = SCAN_INTERVAL;
+  if (countdownTimer) clearInterval(countdownTimer);
+  countdownTimer = setInterval(() => {
+    countdown--;
+    if (countdown <= 0) countdown = 0;
+    $('#next-scan').textContent = t('next_scan') + countdown + 's';
+  }, 1000);
+}
+
+/* ───── Tabs ───── */
+$$('.tab').forEach(t => t.addEventListener('click', () => {
+  $$('.tab').forEach(x => x.classList.remove('active'));
+  $$('.panel').forEach(x => x.classList.remove('active'));
+  t.classList.add('active');
+  $('#p-' + t.dataset.tab).classList.add('active');
+}));
+
+/* ───── Filters ───── */
+$$('.flt').forEach(f => f.addEventListener('click', () => {
+  $$('.flt').forEach(x => x.classList.remove('active'));
+  f.classList.add('active');
+  activeFilter = f.dataset.f;
+  renderOpportunities();
+}));
+
+/* ───── Language Toggle ───── */
+$('#lang-toggle').addEventListener('click', () => {
+  setLang(lang === 'zh' ? 'en' : 'zh');
+});
+
+/* ───── K-line Chart with Zoom & Pan ───── */
+let klineState = { chainIndex: '', address: '', symbol: '', chain: '', bar: '1H' };
+let klineCandles = []; // full dataset
+let klineView = { start: 0, end: 0 }; // visible range indices
+let klineDrag = { active: false, startX: 0, startIdx: 0 };
+
+function openKline(symbol, chain, chainIndex, address) {
+  if (!chainIndex || !address) return;
+  klineState = { chainIndex, address, symbol, chain, bar: '1H' };
+  $('#kline-title').textContent = symbol + ' — ' + chain;
+  $('#kline-overlay').classList.add('show');
+  $$('#kline-bars .kline-bar').forEach(b => b.classList.toggle('active', b.dataset.bar === '1H'));
+  loadCandles();
+}
+
+async function loadCandles() {
+  const canvas = $('#kline-canvas');
+  const info = $('#kline-info');
+  canvas.style.display = 'none';
+  info.style.display = 'block';
+  info.textContent = t('kline_loading');
+
+  try {
+    const params = new URLSearchParams({
+      chainIndex: klineState.chainIndex,
+      address: klineState.address,
+      bar: klineState.bar,
+      limit: '200',
+    });
+    const r = await fetch('/api/candles?' + params);
+    const candles = await r.json();
+
+    if (!candles || candles.length === 0) {
+      info.textContent = t('kline_nodata');
+      return;
+    }
+
+    candles.sort((a, b) => a.ts - b.ts);
+    klineCandles = candles;
+    klineView = { start: 0, end: candles.length };
+    info.style.display = 'none';
+    canvas.style.display = 'block';
+    drawCandles(canvas);
+  } catch {
+    info.textContent = t('kline_error');
+  }
+}
+
+function klineZoom(delta, centerPct) {
+  // delta > 0 = zoom in, delta < 0 = zoom out
+  const len = klineCandles.length;
+  if (len < 3) return;
+  const visible = klineView.end - klineView.start;
+  const change = Math.max(1, Math.round(visible * 0.2)) * (delta > 0 ? -1 : 1);
+  // Zoom around center
+  const leftChange = Math.round(change * centerPct);
+  const rightChange = change - leftChange;
+  let newStart = klineView.start - leftChange;
+  let newEnd = klineView.end + rightChange;
+  // Clamp
+  const minVisible = 5;
+  if (newEnd - newStart < minVisible) {
+    const center = Math.round((klineView.start + klineView.end) / 2);
+    newStart = center - Math.floor(minVisible / 2);
+    newEnd = center + Math.ceil(minVisible / 2);
+  }
+  if (newStart < 0) { newEnd -= newStart; newStart = 0; }
+  if (newEnd > len) { newStart -= (newEnd - len); newEnd = len; }
+  newStart = Math.max(0, newStart);
+  newEnd = Math.min(len, newEnd);
+  klineView = { start: newStart, end: newEnd };
+  drawCandles($('#kline-canvas'));
+}
+
+function klinePan(indexDelta) {
+  const len = klineCandles.length;
+  const visible = klineView.end - klineView.start;
+  let newStart = klineView.start + indexDelta;
+  let newEnd = newStart + visible;
+  if (newStart < 0) { newStart = 0; newEnd = visible; }
+  if (newEnd > len) { newEnd = len; newStart = len - visible; }
+  newStart = Math.max(0, newStart);
+  klineView = { start: newStart, end: newEnd };
+  drawCandles($('#kline-canvas'));
+}
+
+function drawCandles(canvas) {
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width * dpr;
+  canvas.height = rect.height * dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+
+  const W = rect.width, H = rect.height;
+  ctx.clearRect(0, 0, W, H);
+
+  const visCandles = klineCandles.slice(klineView.start, klineView.end);
+  const len = visCandles.length;
+  if (len === 0) return;
+
+  const padL = 10, padR = 75, padT = 15, padB = 28;
+  const chartW = W - padL - padR;
+  const chartH = H - padT - padB;
+
+  // Price range
+  let minP = Infinity, maxP = -Infinity;
+  for (const c of visCandles) {
+    if (c.low < minP) minP = c.low;
+    if (c.high > maxP) maxP = c.high;
+  }
+  const range = maxP - minP || 1;
+  minP -= range * 0.05;
+  maxP += range * 0.05;
+  const totalRange = maxP - minP;
+
+  const yOf = (p) => padT + chartH * (1 - (p - minP) / totalRange);
+
+  // Grid lines + price labels
+  ctx.strokeStyle = '#2b3139';
+  ctx.lineWidth = 0.5;
+  ctx.fillStyle = '#5e6673';
+  ctx.font = '10px monospace';
+  ctx.textAlign = 'left';
+  const decimals = maxP > 1000 ? 2 : maxP > 1 ? 4 : 6;
+  for (let i = 0; i <= 5; i++) {
+    const p = minP + (i / 5) * totalRange;
+    const y = yOf(p);
+    ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(W - padR, y); ctx.stroke();
+    ctx.fillText(p.toFixed(decimals), W - padR + 4, y + 3);
+  }
+
+  // Time labels
+  ctx.textAlign = 'center';
+  const step = Math.max(1, Math.floor(len / 6));
+  for (let i = 0; i < len; i += step) {
+    const x = padL + (i / Math.max(len - 1, 1)) * chartW;
+    const d = new Date(visCandles[i].ts);
+    const lbl = klineState.bar === '1D'
+      ? (d.getMonth()+1) + '/' + d.getDate()
+      : d.getHours().toString().padStart(2,'0') + ':' + d.getMinutes().toString().padStart(2,'0');
+    ctx.fillText(lbl, x, H - 8);
+  }
+
+  // Candles
+  const candleW = Math.max(2, Math.min(12, Math.floor(chartW / len) - 2));
+  for (let i = 0; i < len; i++) {
+    const c = visCandles[i];
+    const x = padL + (i / Math.max(len - 1, 1)) * chartW - candleW / 2;
+    const isGreen = c.close >= c.open;
+    const color = isGreen ? '#0ecb81' : '#f6465d';
+
+    // Wick
+    const wickX = x + candleW / 2;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(wickX, yOf(c.high)); ctx.lineTo(wickX, yOf(c.low)); ctx.stroke();
+
+    // Body
+    ctx.fillStyle = color;
+    const bTop = yOf(Math.max(c.open, c.close));
+    const bBot = yOf(Math.min(c.open, c.close));
+    ctx.fillRect(x, bTop, candleW, Math.max(1, bBot - bTop));
+  }
+
+  // Current price line
+  const lastP = visCandles[len - 1].close;
+  ctx.setLineDash([4, 3]);
+  ctx.strokeStyle = '#fcd535';
+  ctx.lineWidth = 0.8;
+  ctx.beginPath(); ctx.moveTo(padL, yOf(lastP)); ctx.lineTo(W - padR, yOf(lastP)); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = '#fcd535';
+  ctx.font = 'bold 10px monospace';
+  ctx.textAlign = 'left';
+  ctx.fillText(lastP.toFixed(decimals), W - padR + 4, yOf(lastP) - 4);
+
+  // Zoom indicator
+  const total = klineCandles.length;
+  const vis = klineView.end - klineView.start;
+  if (vis < total) {
+    ctx.fillStyle = '#5e6673';
+    ctx.font = '10px sans-serif';
+    ctx.textAlign = 'right';
+    ctx.fillText(`${vis}/${total}`, W - padR - 4, padT - 2);
+  }
+}
+
+function drawSparkEmpty(canvas) {
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width * dpr;
+  canvas.height = rect.height * dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  ctx.fillStyle = '#5e6673';
+  ctx.font = '10px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText(t('kline_nodata'), rect.width / 2, rect.height / 2 + 4);
+}
+
+// K-line modal events
+$('#kline-close').addEventListener('click', () => {
+  $('#kline-overlay').classList.remove('show');
+});
+$('#kline-overlay').addEventListener('click', (e) => {
+  if (e.target === e.currentTarget) $('#kline-overlay').classList.remove('show');
+});
+$$('#kline-bars .kline-bar').forEach(b => {
+  b.addEventListener('click', () => {
+    $$('#kline-bars .kline-bar').forEach(x => x.classList.remove('active'));
+    b.classList.add('active');
+    klineState.bar = b.dataset.bar;
+    loadCandles();
+  });
+});
+
+// Zoom buttons
+$('#kline-zoom-in').addEventListener('click', () => klineZoom(1, 0.5));
+$('#kline-zoom-out').addEventListener('click', () => klineZoom(-1, 0.5));
+$('#kline-zoom-reset').addEventListener('click', () => {
+  klineView = { start: 0, end: klineCandles.length };
+  drawCandles($('#kline-canvas'));
+});
+
+// Mouse wheel zoom on canvas
+$('#kline-canvas').addEventListener('wheel', (e) => {
+  e.preventDefault();
+  const rect = e.target.getBoundingClientRect();
+  const pct = (e.clientX - rect.left) / rect.width;
+  klineZoom(e.deltaY < 0 ? 1 : -1, pct);
+}, { passive: false });
+
+// Mouse drag to pan
+$('#kline-canvas').addEventListener('mousedown', (e) => {
+  klineDrag = { active: true, startX: e.clientX, startIdx: klineView.start };
+  e.target.style.cursor = 'grabbing';
+});
+window.addEventListener('mousemove', (e) => {
+  if (!klineDrag.active) return;
+  const rect = $('#kline-canvas').getBoundingClientRect();
+  const visible = klineView.end - klineView.start;
+  const pxPerCandle = rect.width / Math.max(visible, 1);
+  const dx = klineDrag.startX - e.clientX;
+  const indexDelta = Math.round(dx / pxPerCandle);
+  const newStart = Math.max(0, Math.min(klineCandles.length - visible, klineDrag.startIdx + indexDelta));
+  klineView = { start: newStart, end: newStart + visible };
+  drawCandles($('#kline-canvas'));
+});
+window.addEventListener('mouseup', () => {
+  if (klineDrag.active) {
+    klineDrag.active = false;
+    $('#kline-canvas').style.cursor = 'crosshair';
+  }
+});
+
+// Touch pinch zoom + swipe pan
+let klineTouches = [];
+$('#kline-canvas').addEventListener('touchstart', (e) => {
+  klineTouches = [...e.touches];
+  if (e.touches.length === 1) {
+    klineDrag = { active: true, startX: e.touches[0].clientX, startIdx: klineView.start };
+  }
+}, { passive: true });
+$('#kline-canvas').addEventListener('touchmove', (e) => {
+  e.preventDefault();
+  if (e.touches.length === 2 && klineTouches.length === 2) {
+    // Pinch zoom
+    const prevDist = Math.hypot(klineTouches[0].clientX - klineTouches[1].clientX, klineTouches[0].clientY - klineTouches[1].clientY);
+    const curDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+    if (Math.abs(curDist - prevDist) > 10) {
+      klineZoom(curDist > prevDist ? 1 : -1, 0.5);
+      klineTouches = [...e.touches];
+    }
+  } else if (e.touches.length === 1 && klineDrag.active) {
+    // Swipe pan
+    const rect = $('#kline-canvas').getBoundingClientRect();
+    const visible = klineView.end - klineView.start;
+    const pxPerCandle = rect.width / Math.max(visible, 1);
+    const dx = klineDrag.startX - e.touches[0].clientX;
+    const indexDelta = Math.round(dx / pxPerCandle);
+    const newStart = Math.max(0, Math.min(klineCandles.length - visible, klineDrag.startIdx + indexDelta));
+    klineView = { start: newStart, end: newStart + visible };
+    drawCandles($('#kline-canvas'));
+  }
+}, { passive: false });
+$('#kline-canvas').addEventListener('touchend', () => {
+  klineDrag.active = false;
+  klineTouches = [];
+});
+
+/* ───── Custom Tokens ───── */
+let chainList = [];
+let customTokenList = [];
+
+async function loadChains() {
+  try {
+    const r = await fetch('/api/chains');
+    chainList = await r.json();
+  } catch {}
+}
+
+async function loadCustomTokens() {
+  try {
+    const r = await fetch('/api/custom-tokens');
+    customTokenList = await r.json();
+    renderCustomTags();
+  } catch {}
+}
+
+function renderCustomTags() {
+  const container = $('#custom-tags');
+  if (!container) return;
+  container.innerHTML = customTokenList.map(t =>
+    `<span class="custom-token-tag">${t.symbol}
+      <span class="custom-del" onclick="deleteCustomToken('${t.symbol}')">&times;</span>
+    </span>`
+  ).join('');
+}
+
+async function deleteCustomToken(symbol) {
+  if (!confirm(`Delete custom token ${symbol}?`)) return;
+  try {
+    await fetch('/api/custom-tokens/' + encodeURIComponent(symbol), { method: 'DELETE' });
+    customTokenList = customTokenList.filter(t => t.symbol !== symbol);
+    renderCustomTags();
+  } catch {}
+}
+
+function openAddToken() {
+  $('#add-overlay').classList.add('show');
+  $('#add-sym').value = '';
+  $('#add-cex').value = '';
+  const chainsDiv = $('#add-chains');
+  chainsDiv.innerHTML = '';
+  addChainEntry();
+}
+
+function closeAddToken() {
+  $('#add-overlay').classList.remove('show');
+}
+
+function addChainEntry() {
+  const chainsDiv = $('#add-chains');
+  const idx = chainsDiv.children.length;
+  const chainOpts = chainList.map(c =>
+    `<option value="${c.chainIndex}">${c.name} (${c.chainIndex})</option>`
+  ).join('');
+
+  const div = document.createElement('div');
+  div.className = 'add-chain-entry';
+  div.style.marginBottom = '6px';
+  div.innerHTML = `
+    <div class="add-chain-row">
+      <select class="ac-chain">${chainOpts}</select>
+      <input class="ac-addr" placeholder="${t('add_addr')}" style="flex:2">
+      <span class="add-chain-rm" onclick="this.closest('.add-chain-entry').remove()">&times;</span>
+    </div>
+    <div class="add-chain-row">
+      <input class="ac-dec" type="number" value="18" placeholder="${t('add_decimals')}" style="max-width:80px">
+      <input class="ac-amt" placeholder="${t('add_amount')}: e.g. 1000000000000000000" style="flex:2">
+    </div>
+  `;
+  chainsDiv.appendChild(div);
+}
+
+async function submitAddToken() {
+  const symbol = $('#add-sym').value.trim();
+  const cexInstId = $('#add-cex').value.trim();
+
+  if (!symbol || !cexInstId) {
+    alert(t('add_error') + ': symbol & cexInstId required');
+    return;
+  }
+
+  const chainEntries = [];
+  document.querySelectorAll('#add-chains .add-chain-entry').forEach(entry => {
+    const chainIndex = entry.querySelector('.ac-chain').value;
+    const address = entry.querySelector('.ac-addr').value.trim();
+    const decimals = entry.querySelector('.ac-dec').value.trim();
+    const scanAmount = entry.querySelector('.ac-amt').value.trim();
+    if (chainIndex && address && decimals && scanAmount) {
+      chainEntries.push({ chainIndex, address, decimals, scanAmount });
+    }
+  });
+
+  if (chainEntries.length === 0) {
+    alert(t('add_error') + ': at least one chain');
+    return;
+  }
+
+  try {
+    const r = await fetch('/api/custom-tokens', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ symbol, cexInstId, chains: chainEntries }),
+    });
+    const res = await r.json();
+    if (res.ok) {
+      closeAddToken();
+      await loadCustomTokens();
+      alert(t('add_success'));
+    } else {
+      alert(t('add_error') + ': ' + (res.error || 'unknown'));
+    }
+  } catch (e) {
+    alert(t('add_error'));
+  }
+}
+
+// Close add-token modal on overlay click
+$('#add-overlay')?.addEventListener('click', (e) => {
+  if (e.target === e.currentTarget) closeAddToken();
+});
+
+/* ───── Cross-Chain Paths ───── */
+let ccPaths = [];
+
+async function loadCCPaths() {
+  try {
+    const r = await fetch('/api/cross-chain-paths');
+    ccPaths = await r.json();
+    renderPaths();
+  } catch {}
+}
+
+function renderPathThead() {
+  const keys = ['path_th_label','path_th_from','path_th_to','path_th_amount','path_th_enabled','path_th_action'];
+  $('#path-thead').innerHTML = keys.map(k =>
+    `<th>${t(k)}</th>`
+  ).join('');
+}
+
+function renderPaths() {
+  const tbody = $('#path-body');
+  const empty = $('#path-empty');
+  const countEl = $('#path-count');
+
+  countEl.textContent = ccPaths.length + ' ' + t('path_count');
+
+  if (ccPaths.length === 0) {
+    tbody.innerHTML = '';
+    empty.style.display = 'block';
+    return;
+  }
+  empty.style.display = 'none';
+
+  tbody.innerHTML = ccPaths.map(p => {
+    const fromChain = chainList.find(c => c.chainIndex === p.fromChainIndex)?.name || p.fromChainIndex;
+    const toChain = chainList.find(c => c.chainIndex === p.toChainIndex)?.name || p.toChainIndex;
+    return `<tr>
+      <td><strong>${p.label}</strong></td>
+      <td>${p.fromTokenSymbol}@${fromChain}</td>
+      <td>${p.toTokenSymbol}@${toChain}</td>
+      <td class="num" style="font-family:var(--mono)">${p.amount}</td>
+      <td><button class="path-toggle ${p.enabled ? 'on' : ''}" onclick="togglePath('${p.id}',${!p.enabled})"></button></td>
+      <td><button class="path-del" onclick="deletePath('${p.id}')">&times;</button></td>
+    </tr>`;
+  }).join('');
+}
+
+async function togglePath(id, enabled) {
+  try {
+    await fetch('/api/cross-chain-paths/' + id, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enabled }),
+    });
+    const p = ccPaths.find(p => p.id === id);
+    if (p) p.enabled = enabled;
+    renderPaths();
+  } catch {}
+}
+
+async function deletePath(id) {
+  if (!confirm('Delete this path?')) return;
+  try {
+    await fetch('/api/cross-chain-paths/' + id, { method: 'DELETE' });
+    ccPaths = ccPaths.filter(p => p.id !== id);
+    renderPaths();
+  } catch {}
+}
+
+const USDC_MAP = {};
+
+function openAddPath() {
+  $('#addpath-overlay').classList.add('show');
+  // Populate chain dropdowns
+  const opts = chainList.map(c =>
+    `<option value="${c.chainIndex}">${c.name} (${c.chainIndex})</option>`
+  ).join('');
+  $('#ap-from-chain').innerHTML = opts;
+  $('#ap-to-chain').innerHTML = opts;
+  // Default to Arbitrum → Avalanche
+  const arbOpt = chainList.find(c => c.chainIndex === '42161');
+  const avaxOpt = chainList.find(c => c.chainIndex === '43114');
+  if (arbOpt) $('#ap-from-chain').value = '42161';
+  if (avaxOpt) $('#ap-to-chain').value = '43114';
+  // Reset fields
+  $('#ap-from-symbol').value = 'USDC';
+  $('#ap-from-addr').value = '';
+  $('#ap-from-dec').value = '6';
+  $('#ap-from-amt').value = '';
+  $('#ap-to-symbol').value = '';
+  $('#ap-to-addr').value = '';
+  $('#ap-to-dec').value = '18';
+  $('#ap-sell-symbol').value = 'USDC';
+  $('#ap-sell-addr').value = '';
+  $('#ap-sell-dec').value = '6';
+  updateSellAddr();
+}
+
+function closeAddPath() {
+  $('#addpath-overlay').classList.remove('show');
+}
+
+function updateSellAddr() {
+  // Auto-fill USDC address for the selected dest chain
+  const toChain = $('#ap-to-chain').value;
+  // We'll fetch USDC addresses from the known list
+  const usdcAddrs = {
+    '1': '0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48',
+    '56': '0x8ac76a51cc950d9822d68b83fe1ad97b32cd580d',
+    '42161': '0xaf88d065e77c8cc2239327c5edb3a432268e5831',
+    '137': '0x3c499c542cef5e3811e1192ce70d8cc03d5c3359',
+    '8453': '0x833589fcd6edb6e08f4c7c32d4f71b54bda02913',
+    '10': '0x0b2c639c533813f4aa9d7837caf62653d097ff85',
+    '43114': '0xb97ef9ef8734c71904d8002f8b6bc66dd9c48a6e',
+  };
+  if (usdcAddrs[toChain]) {
+    $('#ap-sell-addr').value = usdcAddrs[toChain];
+  }
+}
+
+async function submitAddPath() {
+  const body = {
+    fromChainIndex: $('#ap-from-chain').value,
+    toChainIndex: $('#ap-to-chain').value,
+    fromTokenSymbol: $('#ap-from-symbol').value.trim() || 'USDC',
+    fromTokenAddress: $('#ap-from-addr').value.trim(),
+    fromTokenDecimals: parseInt($('#ap-from-dec').value) || 6,
+    toTokenSymbol: $('#ap-to-symbol').value.trim(),
+    toTokenAddress: $('#ap-to-addr').value.trim(),
+    toTokenDecimals: parseInt($('#ap-to-dec').value) || 18,
+    sellTokenSymbol: $('#ap-sell-symbol').value.trim() || 'USDC',
+    sellTokenAddress: $('#ap-sell-addr').value.trim(),
+    sellTokenDecimals: parseInt($('#ap-sell-dec').value) || 6,
+    amount: $('#ap-from-amt').value.trim(),
+    enabled: true,
+  };
+
+  if (!body.fromTokenAddress || !body.toTokenAddress || !body.amount) {
+    alert(t('path_error') + ': fill all required fields');
+    return;
+  }
+
+  try {
+    const r = await fetch('/api/cross-chain-paths', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const res = await r.json();
+    if (res.ok) {
+      closeAddPath();
+      await loadCCPaths();
+      alert(t('path_success'));
+    } else {
+      alert(t('path_error') + ': ' + (res.error || 'unknown'));
+    }
+  } catch (e) {
+    alert(t('path_error'));
+  }
+}
+
+// Auto-update sell address when dest chain changes
+$('#ap-to-chain')?.addEventListener('change', updateSellAddr);
+
+// Close add-path modal on overlay click
+$('#addpath-overlay')?.addEventListener('click', (e) => {
+  if (e.target === e.currentTarget) closeAddPath();
+});
+
+/* ───── Init ───── */
+setLang(lang); // apply stored language
+loadChains();
+loadCustomTokens();
+loadCCPaths();
+fetchStatus();
+setInterval(fetchStatus, REFRESH_MS);
+</script>
+</body>
+</html>

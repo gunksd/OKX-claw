@@ -1,0 +1,24 @@
+{
+  "name": "okx-claw",
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "scan": "tsx src/index.ts",
+    "scan:watch": "tsx watch src/index.ts",
+    "dev": "tsx src/server.ts",
+    "dashboard": "tsx src/server.ts"
+  },
+  "dependencies": {
+    "axios": "^1.7.0",
+    "crypto-js": "^4.2.0",
+    "dotenv": "^16.4.0",
+    "express": "^4.22.1"
+  },
+  "devDependencies": {
+    "@types/crypto-js": "^4.2.0",
+    "@types/express": "^5.0.6",
+    "@types/node": "^22.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  }
+}
