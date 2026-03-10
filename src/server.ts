@@ -8,6 +8,7 @@ import {
   WNATIVE,
   CHAINS,
   USDC,
+  ARB_THRESHOLD_PCT,
   type TokenConfig,
   type CrossChainPath,
 } from "./config.js";
@@ -377,6 +378,7 @@ async function runScan(): Promise<void> {
     }
   }
 
+  // Count summary (real opportunities only, before near-miss entries)
   const passed = allOpps.filter((o) => o.validated);
   const blocked = allOpps.filter(
     (o) => !o.validated && o.detail.includes("BLOCKED"),
@@ -384,6 +386,86 @@ async function runScan(): Promise<void> {
   const failed = allOpps.filter(
     (o) => !o.validated && !o.detail.includes("BLOCKED"),
   );
+
+  // Generate near-miss entries for tokens with no arb opportunities
+  for (const token of tokens) {
+    if (allOpps.some((o) => o.token === token.symbol)) continue;
+    const prices = dexPricesFull.get(token.symbol);
+    if (!prices || prices.length === 0) continue;
+
+    let maxSpread = 0;
+    let buyChain = "",
+      sellChain = "";
+    let buyPrice = 0,
+      sellPrice = 0;
+    let bestType: "cross-chain" | "dex-cex" = "cross-chain";
+
+    // Cross-chain spreads
+    for (let i = 0; i < prices.length; i++) {
+      for (let j = i + 1; j < prices.length; j++) {
+        const lo = Math.min(prices[i].price, prices[j].price);
+        const hi = Math.max(prices[i].price, prices[j].price);
+        const spread = lo > 0 ? ((hi - lo) / lo) * 100 : 0;
+        if (spread > maxSpread) {
+          maxSpread = spread;
+          const [buy, sell] =
+            prices[i].price < prices[j].price
+              ? [prices[i], prices[j]]
+              : [prices[j], prices[i]];
+          buyChain = buy.chainName;
+          buyPrice = buy.price;
+          sellChain = sell.chainName;
+          sellPrice = sell.price;
+          bestType = "cross-chain";
+        }
+      }
+    }
+
+    // DEX-CEX spreads
+    const cexP = cexPrices[token.symbol];
+    if (cexP > 0) {
+      for (const p of prices) {
+        const spread = Math.abs((p.price - cexP) / cexP) * 100;
+        if (spread > maxSpread) {
+          maxSpread = spread;
+          if (p.price > cexP) {
+            buyChain = "CEX";
+            buyPrice = cexP;
+            sellChain = `DEX(${p.chainName})`;
+            sellPrice = p.price;
+          } else {
+            buyChain = `DEX(${p.chainName})`;
+            buyPrice = p.price;
+            sellChain = "CEX";
+            sellPrice = cexP;
+          }
+          bestType = "dex-cex";
+        }
+      }
+    }
+
+    if (maxSpread > 0) {
+      allOpps.push({
+        type: bestType,
+        token: token.symbol,
+        buyAt: buyChain,
+        buyPrice,
+        sellAt: sellChain,
+        sellPrice,
+        spreadPct: maxSpread,
+        canDeposit: true,
+        canWithdraw: true,
+        dwUnknown: false,
+        validated: false,
+        detail: `NO_ARB: best spread ${maxSpread.toFixed(2)}% < ${ARB_THRESHOLD_PCT}% threshold`,
+        netProfitUsd: 0,
+        netProfitPct: 0,
+        gasCostUsd: 0,
+        slippageCostUsd: 0,
+        bridgeFeeUsd: 0,
+      });
+    }
+  }
 
   current = {
     timestamp: new Date().toISOString(),

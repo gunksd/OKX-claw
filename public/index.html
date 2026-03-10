@@ -109,6 +109,8 @@ tbody tr:hover{background:var(--bg-hover)}
 .tag-block{background:var(--yellow-bg);color:var(--yellow)}
 .tag-fail{background:var(--red-bg);color:var(--red)}
 .tag-skip{background:rgba(94,102,115,.15);color:var(--text-tri)}
+.tag-noarb{background:rgba(255,255,255,.06);color:#666}
+tr.noarb-row{opacity:.45}
 
 /* ───── Price Matrix ───── */
 .price-grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(360px,1fr))}
@@ -507,6 +509,7 @@ const I18N = {
     flt_valid:      '已验证',
     flt_blocked:    '已阻止',
     flt_failed:     '失败',
+    tag_noarb:      '无机会',
     th_token:       '代币',
     th_type:        '类型',
     th_buy:         '买入',
@@ -523,6 +526,7 @@ const I18N = {
     type_cc:        '跨链',
     type_dc:        'DEX↔CEX',
     empty_wait:     '等待首次扫描...',
+    empty_none:     '本轮扫描未发现套利机会（所有价差 < 3%）',
     empty_filter:   '没有匹配该筛选条件的机会',
     empty_prices:   '暂无价格数据',
     empty_history:  '暂无历史记录',
@@ -594,6 +598,7 @@ const I18N = {
     flt_valid:      'Validated',
     flt_blocked:    'Blocked',
     flt_failed:     'Failed',
+    tag_noarb:      'NO ARB',
     th_token:       'Token',
     th_type:        'Type',
     th_buy:         'Buy At',
@@ -610,6 +615,7 @@ const I18N = {
     type_cc:        'Cross-chain',
     type_dc:        'DEX\u2194CEX',
     empty_wait:     'Waiting for first scan...',
+    empty_none:     'No arbitrage opportunities this scan (all spreads < 3%)',
     empty_filter:   'No opportunities match this filter',
     empty_prices:   'No price data yet',
     empty_history:  'No history yet',
@@ -793,28 +799,35 @@ function renderOpportunities() {
 
   if (activeFilter === 'validated') opps = opps.filter(o => o.validated);
   else if (activeFilter === 'blocked') opps = opps.filter(o => !o.validated && o.detail?.includes('BLOCKED'));
-  else if (activeFilter === 'failed') opps = opps.filter(o => !o.validated && !o.detail?.includes('BLOCKED'));
+  else if (activeFilter === 'failed') opps = opps.filter(o => !o.validated && !o.detail?.includes('BLOCKED') && !o.detail?.includes('NO_ARB'));
 
   if (opps.length === 0) {
     tbody.innerHTML = '';
     empty.style.display = 'block';
-    $('#opp-empty-text').textContent = data?.timestamp ? t('empty_filter') : t('empty_wait');
+    $('#opp-empty-text').textContent = !data?.timestamp ? t('empty_wait')
+      : (data.opportunities?.length === 0 && activeFilter === 'all') ? t('empty_none')
+      : t('empty_filter');
     return;
   }
   empty.style.display = 'none';
 
-  // Sort: validated first, then by spread desc
+  // Sort: validated first, then real opps, then NO_ARB at bottom; within group by spread desc
   opps.sort((a,b) => {
+    const aNoArb = a.detail?.includes('NO_ARB') ? 1 : 0;
+    const bNoArb = b.detail?.includes('NO_ARB') ? 1 : 0;
+    if (aNoArb !== bNoArb) return aNoArb - bNoArb;
     if (a.validated !== b.validated) return b.validated ? 1 : -1;
     return b.spreadPct - a.spreadPct;
   });
 
   tbody.innerHTML = opps.map(o => {
+    const isNoArb = o.detail?.includes('NO_ARB');
     const dwStr = o.dwUnknown ? '<span class="muted">?/?</span>'
       : `<span class="${o.canDeposit?'pos':'neg'}">${o.canDeposit?'Y':'N'}</span>/<span class="${o.canWithdraw?'pos':'neg'}">${o.canWithdraw?'Y':'N'}</span>`;
 
     let tag = '';
     if (o.validated) tag = '<span class="tag tag-pass">PASS</span>';
+    else if (isNoArb) tag = `<span class="tag tag-noarb">${t('tag_noarb')}</span>`;
     else if (o.detail?.includes('BLOCKED')) tag = `<span class="tag tag-block">${t('flt_blocked').toUpperCase()}</span>`;
     else if (o.detail?.includes('SKIP')) tag = '<span class="tag tag-skip">SKIP</span>';
     else tag = `<span class="tag tag-fail">${t('flt_failed').toUpperCase()}</span>`;
@@ -824,7 +837,7 @@ function renderOpportunities() {
     const netCls = netPct >= 5 ? 'pos' : netPct > 0 ? 'warn' : netPct < 0 ? 'neg' : '';
     const typeLabel = o.type === 'cross-chain' ? t('type_cc') : o.type === 'cross-chain-path' ? t('type_ccp') : t('type_dc');
 
-    return `<tr>
+    return `<tr${isNoArb ? ' class="noarb-row"' : ''}>
       <td><strong>${o.token}</strong></td>
       <td>${typeLabel}</td>
       <td>${o.buyAt}</td>
@@ -832,11 +845,11 @@ function renderOpportunities() {
       <td>${o.sellAt}</td>
       <td class="num">$${fmt(o.sellPrice)}</td>
       <td class="num ${spreadCls}">${fmt(o.spreadPct,3)}%</td>
-      <td class="num ${netCls}">${fmt(netPct,2)}%</td>
-      <td class="num ${netCls}">${fmtK(o.netProfitUsd)}</td>
-      <td class="num muted">${fmtGas(o)}</td>
-      <td class="num muted">$${fmt(o.bridgeFeeUsd||0)}</td>
-      <td>${dwStr}</td>
+      <td class="num ${isNoArb ? 'muted' : netCls}">${isNoArb ? '-' : fmt(netPct,2)+'%'}</td>
+      <td class="num ${isNoArb ? 'muted' : netCls}">${isNoArb ? '-' : fmtK(o.netProfitUsd)}</td>
+      <td class="num muted">${isNoArb ? '-' : fmtGas(o)}</td>
+      <td class="num muted">${isNoArb ? '-' : '$'+fmt(o.bridgeFeeUsd||0)}</td>
+      <td>${isNoArb ? '<span class="muted">-</span>' : dwStr}</td>
       <td>${tag}</td>
     </tr>`;
   }).join('');
